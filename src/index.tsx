@@ -4,6 +4,7 @@ import ReactDOM from "react-dom";
 import { useState, useEffect, useRef } from "react";
 //esBuild plugin to address where files will be sourced instead of from the local file system
 import { unpkgPathPlugin } from "./plugins/package-path-plugin";
+import { fetchPlugin } from "./plugins/fetch-plugin";
 
 const App = () => {
   const ref = useRef<any>();
@@ -18,7 +19,7 @@ const App = () => {
     //ref.current created a reference to anything wed like to use within a component in this case, the bundler/transpiler service through esBuild
     ref.current = await esbuild.startService({
       worker: true,
-      wasmURL: "/esbuild.wasm",
+      wasmURL: "https://unpkg.com/esbuild-wasm@0.8.27/esbuild.wasm",
     });
   };
 
@@ -30,7 +31,7 @@ const App = () => {
       entryPoints: ["index.js"],
       bundle: true,
       write: false,
-      plugins: [unpkgPathPlugin()],
+      plugins: [unpkgPathPlugin(), fetchPlugin(input)],
       define: {
         "process.env.NODE_ENV": '"production"',
         global: "window",
