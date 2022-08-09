@@ -1,7 +1,11 @@
 import * as esbuild from "esbuild-wasm";
 import axios from "axios";
+import localForage from "localforage";
 
-//
+//initializes an intance of the localForage indexedDB in the window
+const fileCache = localForage.createInstance({
+  name: "filecache",
+});
 
 export const unpkgPathPlugin = () => {
   return {
@@ -10,7 +14,6 @@ export const unpkgPathPlugin = () => {
     //BUILD() called automatically with single argument. represents the bundling process
 
     //interact with build process by attaching event listeners to listen to onResolve and onLoad events
-
     //the filter property determines when an onResolve or onLoad method is called. ex. only run on typescript file or on .js etc
     setup(build: esbuild.PluginBuild) {
       //onResolve used to figure out what the actual path is to a particular file/module
@@ -47,12 +50,26 @@ export const unpkgPathPlugin = () => {
             `,
           };
         }
+        //Check if we already fetched the file and if its in the cache
+        const cacheResult = await fileCache.getItem<esbuild.OnLoadResult>(
+          args.path
+        );
+        //if it is cached, return the item immediately
+        if (cacheResult) {
+          return cacheResult;
+        }
+
         const { data, request } = await axios.get(args.path);
-        return {
+        //store response in variable
+        const result: esbuild.OnLoadResult = {
           loader: "jsx",
           contents: data,
           resolveDir: new URL("./", request.responseURL).pathname,
         };
+        //store object as value in cache
+        await fileCache.setItem(args.path, result);
+
+        return result;
       });
     },
   };
