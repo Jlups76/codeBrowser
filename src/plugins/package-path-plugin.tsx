@@ -1,4 +1,5 @@
 import * as esbuild from "esbuild-wasm";
+import axios from "axios";
 
 //
 
@@ -12,10 +13,25 @@ export const unpkgPathPlugin = () => {
 
     //the filter property determines when an onResolve or onLoad method is called. ex. only run on typescript file or on .js etc
     setup(build: esbuild.PluginBuild) {
-      //onResolve used to figure out what the actual path is to a particular file
+      //onResolve used to figure out what the actual path is to a particular file/module
       build.onResolve({ filter: /.*/ }, async (args: any) => {
-        console.log("onResole", args);
-        return { path: args.path, namespace: "a" };
+        console.log("onResolve", args);
+        if (args.path === "index.js") {
+          return { path: args.path, namespace: "a" };
+        }
+
+        if (args.path.includes("./") || args.path.includes("../"))
+          return {
+            namespace: "a",
+            // new URL creates a new URL with the following args new URL(addOnURL, baseURL) it is important to include the + '/' at the end of args.importer in order to get the correct functionality
+            path: new URL(args.path, args.importer + "/").href,
+          };
+        //else if (args.path === "tiny-test-pkg") {
+        //   return {
+        //     path: "https://unpkg.com/tiny-test-pkg@1.0.0/index.js",
+        //     namespace: "a",
+        //   };
+        // }
       });
       //onLoad used to actually load a file from the file_system
       build.onLoad({ filter: /.*/ }, async (args: any) => {
@@ -25,11 +41,16 @@ export const unpkgPathPlugin = () => {
           return {
             loader: "jsx",
             contents: `
-              import message from 'tiny-test-pkg';
+              const message = require('medium-test-pkg')
               console.log(message);
             `,
           };
         }
+        const { data } = await axios.get(args.path);
+        return {
+          loader: "jsx",
+          contents: data,
+        };
       });
     },
   };
@@ -50,4 +71,18 @@ export const unpkgPathPlugin = () => {
  *   where the requested file is (onResolve step)
  *
  * - Attempt to load that file up (onLoad step)
+ */
+
+/**onResolve args:
+ *
+ * - importer ("who" is importing the file ie. index.js)
+ * - namespace
+ * - path (current path to the file)
+ * - resolveDir
+ */
+
+/**onLoad args:
+ *
+ * - namespace
+ * - path: (path provided by on resolve)
  */
