@@ -8,8 +8,8 @@ import { fetchPlugin } from "./plugins/fetch-plugin";
 
 const App = () => {
   const ref = useRef<any>();
+  const iframe = useRef<any>();
   const [input, setInput] = useState("");
-  const [code, setCode] = useState("");
 
   useEffect(() => {
     startService();
@@ -27,6 +27,9 @@ const App = () => {
     if (!ref.current) {
       return;
     }
+
+    iframe.current.srcdoc = html;
+
     const result = await ref.current.build({
       entryPoints: ["index.js"],
       bundle: true,
@@ -37,10 +40,28 @@ const App = () => {
         global: "window",
       },
     });
-    // console.log(result);
-    setCode(result.outputFiles[0].text);
+    iframe.current.contentWindow.postMessage(result.outputFiles[0].text, "*");
   };
-
+  //we can use "postMessaging" to communicate in a "safe" way between the iframe and the parent DOM
+  const html = `
+    <html>
+     <head></head>
+     <body>
+      <div id='root'></div>
+      <script>
+        window.addEventListener('message',(event) => {
+          try{
+         eval(event.data)
+          }catch(err){
+            const root = document.querySelector('#root');
+            root.innerHTML = '<div style="color: red;"><h4>Runtime Error</h4>' + err + '</div>';
+            console.error(err);
+          }
+       }, false)
+        </script>
+      </body>
+    </html>
+  `;
   return (
     <div>
       <textarea
@@ -50,7 +71,17 @@ const App = () => {
       <div>
         <button onClick={onClick}>Submit</button>
       </div>
-      <pre>{code}</pre>
+      {/** iframe used to embed one HTML element inside of another!
+       *
+       * sandbox property must be set to 'allow-same-origin'
+       * OTHERWISE NO COMMUNICATION IS ALLOWED
+       */}
+      <iframe
+        title='code window'
+        ref={iframe}
+        sandbox='allow-scripts'
+        srcDoc={html}
+      />
     </div>
   );
 };
@@ -63,3 +94,5 @@ ReactDOM.render(<App />, document.querySelector("#root"));
 //   //target = what options the transpiler will use. in this case es2015 syntax
 //   target: "es2015",
 // });
+
+//option to refactor iFrame.. use seperate server ie.localHost:4006 etc to serve HTML doc and create complete seperation of concerns
